@@ -77,6 +77,7 @@ def run_experiment(
     print_advfo_every: int = 20,
     out_dir: str = ".",
     exp_name: str = "exp",
+    save_results: bool = True,
 ):
     """
     Runs a federated learning experiment comparing random client selection (FedAvg)
@@ -141,6 +142,7 @@ def run_experiment(
         print_advfo_every:         prints adv=Q1-Q0 and fo for all clients every N rounds
         out_dir:                   directory where the JSON results file is saved
         exp_name:                  experiment name included in the output filename
+        save_results:              if False, skips JSON and plot generation (useful for minimal tests)
     """
 
     if attack_rounds is None:
@@ -189,6 +191,9 @@ def run_experiment(
     }
 
     def save_json():
+        if not save_results:
+            return
+
         for key in ["fedavg", "marl"]:
             cnt = np.array(log["tracks"][key]["selection_count_total_per_client"], dtype=np.int64)
             log["tracks"][key]["final_metrics"] = {
@@ -208,13 +213,6 @@ def run_experiment(
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(log, f, indent=2)
         print(f"\n[JSON] salvo em: {str(out_path)}\n", flush=True)
-
-        # Gera gráfico automaticamente
-        try:
-            import subprocess
-            subprocess.run(["python", "plot.py", str(out_path)], check=True)
-        except Exception as e:
-            print(f"[PLOT] Erro ao gerar gráfico: {e}", flush=True)
 
         # Gera gráfico automaticamente
         try:

@@ -1,6 +1,7 @@
 """
 Teste mínimo de execução para verificação da instalação.
-Roda 10 rodadas com 10 clientes..
+Roda 10 rodadas com 10 clientes — deve completar em poucos minutos em CPU.
+Não gera JSON nem gráfico.
 """
 from experiment import run_experiment
 
@@ -19,4 +20,5 @@ run_experiment(
     updates_per_round=5,
     print_every=1,
     out_dir=".",
+    save_results=False,
 )
