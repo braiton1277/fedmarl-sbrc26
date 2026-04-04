@@ -1,12 +1,12 @@
 # Seleção de Clientes Federados usando Aprendizado por Reforço Multiagente
 
-Este artefato contém a implementação do mecanismo de seleção de clientes para Aprendizado Federado (FL) proposto no artigo **"Seleção de Clientes Federados usando Aprendizado por Reforço Multiagente"**, submetido ao SBRC 2026. 
+Este artefato contém a implementação do mecanismo de seleção de clientes para Aprendizado Federado (FL) proposto no artigo **"Seleção de Clientes Federados usando Aprendizado por Reforço Multiagente"**, submetido ao SBRC 2026.
 
 No aprendizado federado, o servidor central decide quais clientes devem participar de cada rodada de treinamento. Entretanto, estratégias tradicionais que não estimam a contribuição de cada cliente podem ser vulneráveis a dados de baixa qualidade e a clientes maliciosos. Este trabalho investiga uma abordagem de seleção de clientes baseada no aprendizado por reforço multiagente (MARL). A arquitetura proposta modela cada cliente como um agente, no qual as decisões são tomadas de forma descentralizada e cooperativa. Cada agente avalia características como diversidade de dados, capacidade de processamento e histórico de participação, aprendendo a contribuir para uma seleção mais estratégica dos participantes do treinamento em cenários dinâmicos e não-IID. Os experimentos simulam diferentes graus de heterogeneidade entre os clientes, refletindo distribuições não-IID, além de considerar cenários com inversão de rótulos como estratégia de ataque ao aprendizado. O desempenho, em comparação ao FedAvg e ao single-agent RL (SARL), demonstra melhoria na acurácia final do modelo e no equilíbrio na participação dos clientes.
 
 ---
 
-# Estrutura do README
+# Estrutura do README.md
 
 Este README está organizado nas seguintes seções:
 
@@ -28,6 +28,8 @@ fedmarl-sbrc25/
 │   ├── exp2.py          # Experimento 2: 60% atacantes, 100% inversão
 │   ├── exp3.py          # Experimento 3: 40% atacantes, 60% inversão
 │   ├── exp4.py          # Experimento 4: 40% atacantes, 40% inversão
+│   ├── exp5.py          # Experimento 5: 40% atacantes, 100% inversão, K=10
+│   ├── exp6.py          # Experimento 6: 40% atacantes, 100% inversão, K=35
 │   └── results/         # JSONs e PNGs gerados pelos experimentos
 ├── config.py            # Semente global, dispositivo e utilitários de reprodutibilidade
 ├── model.py             # Definição da SmallCNN para CIFAR-10
@@ -135,7 +137,7 @@ python test_min.py
 
 # Experimentos
 
-Os experimentos comparam a seleção de clientes por MARL com a seleção aleatória (FedAvg) sob diferentes cenários de ataque de label flipping e dados não-IID, ao longo de 500 rodadas de treinamento com 50 clientes, selecionando 15 por rodada.
+Os experimentos comparam a seleção de clientes por MARL com a seleção aleatória (FedAvg) sob diferentes cenários de ataque de label flipping e dados não-IID, ao longo de 500 rodadas de treinamento com 50 clientes. Os principais experimentos do artigo estão descritos abaixo. Para cada um, são fornecidos o comando de execução e o resultado esperado.
 
 **Recursos esperados:** ~32 GB VRAM (GPU utilizada no artigo); em GPUs com menos memória, reduzir `n_clients` ou `max_per_client`.
 
@@ -178,6 +180,24 @@ python experiments/exp4.py
 ```
 
 **Resultado esperado:** mesmo com ataques de menor intensidade, a trilha MARL mantém acurácia superior à FedAvg, evidenciando a robustez da abordagem em diferentes níveis de ataque.
+
+## Reivindicação #3 — Impacto da variação do número de clientes selecionados (parâmetro K)
+
+Avalia o desempenho da abordagem MARL com diferentes frações de clientes selecionados por rodada, mantendo 40% de atacantes e 100% de inversão de rótulos.
+
+**Experimento 5** — K=10 (20% dos clientes):
+
+```bash
+python experiments/exp5.py
+```
+
+**Experimento 6** — K=35 (70% dos clientes):
+
+```bash
+python experiments/exp6.py
+```
+
+**Resultado esperado:** a abordagem MARL mantém acurácia superior à FedAvg independentemente do valor de K, demonstrando robustez à variação do número de clientes selecionados por rodada.
 
 ---
 
