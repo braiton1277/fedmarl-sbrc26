@@ -82,7 +82,7 @@ Os selos considerados são: **Disponíveis (SeloD)**, **Funcionais (SeloF)**, **
 
 **Software:**
 
-- Sistema Operacional: Linux (recomendado)
+- Sistema Operacional: Debian GNU/Linux 12 (bookworm)   
 - Kernel: 6.1.0-41-amd64
 - Driver NVIDIA: 580.105.08
 - Python: 3.11
