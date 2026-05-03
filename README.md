@@ -23,6 +23,8 @@ O repositório está organizado da seguinte forma:
 
 ```
 fedmarl-sbrc25/
+├── conf/
+│   └── experiments.yaml # Configuração dos experimentos
 ├── experiments/
 │   ├── exp1.py          # Experimento 1: 40% atacantes, 100% inversão
 │   ├── exp2.py          # Experimento 2: 60% atacantes, 100% inversão
@@ -38,7 +40,7 @@ fedmarl-sbrc25/
 ├── server.py            # Treinamento local, agregação FedAvg e rastreamento de estado
 ├── agent.py             # Agente MARL: Q-network, replay buffer PER e seleção Top-K
 ├── experiment.py        # Loop principal do experimento (FedAvg vs MARL)
-├── main.py              # Ponto de entrada com hiperparâmetros configuráveis
+├── main.py              # Execução do experimento
 ├── test_min.py          # Script de teste mínimo para verificação da instalação
 ├── plot.py              # Script de plotagem de resultados a partir do JSON
 └── requirements.txt     # Dependências do projeto
@@ -71,6 +73,9 @@ Os selos considerados são: **Disponíveis (SeloD)**, **Funcionais (SeloF)**, **
 
 **Hardware utilizado nos experimentos do artigo:**
 
+
+- CPU: AMD Ryzen 9 7950X (16 núcleos / 32 threads)
+- RAM: 64 GB
 - GPU: NVIDIA GeForce RTX 5090 (21.760 núcleos CUDA, 32 GB GDDR7, 1,79 TB/s)
 
 > GPU é fortemente recomendado para reprodução dos experimentos. O código também executa em CPU, porém com tempo significativamente maior.
@@ -78,20 +83,25 @@ Os selos considerados são: **Disponíveis (SeloD)**, **Funcionais (SeloF)**, **
 **Software:**
 
 - Sistema Operacional: Linux (recomendado)
-- Python: 3.9 ou superior
-- CUDA: compatível com a versão do PyTorch instalada
+- Kernel: 6.1.0-41-amd64
+- Driver NVIDIA: 580.105.08
+- Python: 3.11
+- PyTorch: 2.9.1 (build cu128)
 
 ---
 
 # Dependências
 
-| Biblioteca | Versão mínima |
-|---|---|
-| Python | 3.9 |
-| torch | 2.0 |
-| torchvision | 0.15 |
-| numpy | 1.24 |
-| matplotlib | 3.7 |
+| Biblioteca   | Versão usada nos experimentos |
+|--------------|-------------------------------|
+| Python       | 3.11                          |
+| torch*       | 2.9.1+cu128                   |
+| torchvision* | 0.24                          |
+| numpy        | 2.1                           |
+| matplotlib   | 3.9                           |
+| pyyaml       | 6.0                           |
+
+\* O `torch` e `torchvision` **não** são instalados pelo `requirements.txt` — veja a seção de Instalação para o procedimento correto, que depende do driver CUDA da máquina.
 
 O dataset CIFAR-10 é baixado automaticamente pelo `torchvision` na primeira execução (aproximadamente 170 MB). Não é necessário acesso a recursos externos além do PyPI e dos servidores do CIFAR-10.
 
@@ -115,7 +125,13 @@ python -m venv venv
 source venv/bin/activate  # Linux/macOS
 # ou: venv\Scripts\activate  # Windows
 
-# 3. Instale as dependências
+# 3. Instale o PyTorch com a build CUDA apropriada para o seu driver
+#    (https://pytorch.org/get-started/locally/)
+#    Para reproduzir o ambiente original dos experimentos:
+pip install torch==2.9.1 torchvision==0.24.0 --index-url https://download.pytorch.org/whl/cu128
+
+
+# 4. Instale as demais dependências
 pip install -r requirements.txt
 ```
 

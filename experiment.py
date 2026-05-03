@@ -12,7 +12,7 @@ import json
 import random
 import uuid
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -20,7 +20,7 @@ from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
 
 from agent import VDNSelector, build_context_matrix_vdn
-from config import DEVICE, SEED, log_step, seed_worker
+from config import DEVICE, SEED, ExperimentConfig, log_step, seed_worker
 from data import (SwitchableTargetedLabelFlipSubset,
                   make_clients_dirichlet_indices, make_server_val_balanced)
 from metrics import (dynamic_batch_size, eval_acc, eval_loss, windowed_reward)
@@ -29,59 +29,13 @@ from server import (apply_fedavg, compute_deltas_proj_mom_probe_now,
                     update_staleness_streak)
 
 
-def run_experiment(
-    rounds: int = 300,
-    n_clients: int = 50,
-    k_select: int = 15,
-    dir_alpha: float = 0.3,
-    # Attack
-    initial_flip_fraction: float = 0.0,
-    flip_add_fraction: float = 0.20,
-    attack_rounds: List[int] = None,
-    flip_rate_initial: float = 1.0,
-    flip_rate_new_attack: float = 1.0,
-    targeted_only_map_classes: bool = True,
-    target_map: Optional[Dict[int, int]] = None,
-    # Train
-    max_per_client: int = 2500,
-    local_lr: float = 0.01,
-    local_steps: int = 10,
-    probe_batches: int = 5,
-    mom_beta: float = 0.90,
-    # RL
-    reward_window_W: int = 5,
-    marl_eps: float = 0.15,
-    marl_swap_m: int = 2,
-    marl_lr: float = 1e-3,
-    marl_gamma: float = 0.90,
-    marl_hidden: int = 128,
-    marl_target_sync_every: int = 20,
-    warmup_transitions: int = 200,
-    start_train_round: int = 100,
-    updates_per_round: int = 50,
-    train_every: int = 1,
-    buf_size: int = 20000,
-    batch_base: int = 64,
-    batch_max: int = 256,
-    batch_buffer_ratio: int = 4,
-    per_alpha: float = 0.6,
-    per_beta_start: float = 0.4,
-    per_beta_end: float = 1.0,
-    per_beta_steps: int = 4000,
-    per_eps: float = 1e-3,
-    # Eval
-    val_shuffle: bool = False,
-    val_per_class: int = 200,
-    eval_max_batches: int = 20,
-    print_every: int = 10,
-    print_advfo_every: int = 20,
-    out_dir: str = ".",
-    exp_name: str = "exp",
-    save_results: bool = True,
-):
+def run_experiment(cfg: ExperimentConfig):
     """
     Runs a federated learning experiment comparing random client selection (FedAvg)
     against MARL-based selection (VDN) under non-IID data and label flipping attacks.
+
+    All hyperparameters are taken from the provided ExperimentConfig instance.
+    See config.py for the full list of fields and their defaults.
 
     Both tracks share the same client loaders. Each round:
     - All clients run local_steps SGD steps to compute proj, gener and fo.
@@ -99,51 +53,55 @@ def run_experiment(
     per-client selection counts for both tracks.
 
     Args:
-        rounds:                    number of federated training rounds
-        n_clients:                 total number of clients
-        k_select:                  number of clients selected per round (K)
-        dir_alpha:                 Dirichlet concentration parameter for non-IID split
-        initial_flip_fraction:     fraction of clients that are attackers from round 1
-        flip_add_fraction:         fraction of clients converted to attackers at each attack round
-        attack_rounds:             list of rounds at which new attackers are introduced
-        flip_rate_initial:         label flip rate for initial attackers (0.0 to 1.0)
-        flip_rate_new_attack:      label flip rate for attackers added mid-training
-        targeted_only_map_classes: if True, only flips classes present in target_map
-        target_map:                custom class mapping for targeted flipping
-        max_per_client:            maximum number of samples per client
-        local_lr:                  SGD learning rate for local training
-        local_steps:               number of SGD steps per client per round
-        probe_batches:             number of batches used to compute gener
-        mom_beta:                  EMA coefficient for server gradient momentum
-        reward_window_W:           window size for windowed reward computation
-        marl_eps:                  exploration probability for Top-K perturbation
-        marl_swap_m:               number of clients swapped during exploration
-        marl_lr:                   Adam learning rate for the Q-network
-        marl_gamma:                discount factor for the VDN agent
-        marl_hidden:               hidden layer size of the Q-network
-        marl_target_sync_every:    target network sync frequency
-        warmup_transitions:        minimum buffer size before MARL training begins
-        start_train_round:         earliest round at which MARL training can start
-        updates_per_round:         Q-network optimization steps per round
-        train_every:               MARL training frequency in rounds
-        buf_size:                  replay buffer capacity
-        batch_base:                minimum batch size for MARL training
-        batch_max:                 maximum batch size for MARL training
-        batch_buffer_ratio:        buffer-to-batch ratio for dynamic batch sizing
-        per_alpha:                 PER prioritization exponent
-        per_beta_start:            initial PER importance sampling exponent
-        per_beta_end:              final PER importance sampling exponent
-        per_beta_steps:            steps for PER beta annealing
-        per_eps:                   PER numerical stability constant
-        val_shuffle:               whether to shuffle the validation loader
-        val_per_class:             number of validation samples per class
-        eval_max_batches:          maximum batches used for loss evaluation
-        print_every:               summary print frequency in rounds
-        print_advfo_every:         prints adv=Q1-Q0 and fo for all clients every N rounds
-        out_dir:                   directory where the JSON results file is saved
-        exp_name:                  experiment name included in the output filename
-        save_results:              if False, skips JSON and plot generation (useful for minimal tests)
+        cfg: ExperimentConfig with all hyperparameters for this run.
     """
+
+    # ---------- Unpack config into local names (preserves the rest of the body) ----------
+    rounds                    = cfg.rounds
+    n_clients                 = cfg.n_clients
+    k_select                  = cfg.k_select
+    dir_alpha                 = cfg.dir_alpha
+    initial_flip_fraction     = cfg.initial_flip_fraction
+    flip_add_fraction         = cfg.flip_add_fraction
+    attack_rounds             = cfg.attack_rounds
+    flip_rate_initial         = cfg.flip_rate_initial
+    flip_rate_new_attack      = cfg.flip_rate_new_attack
+    targeted_only_map_classes = cfg.targeted_only_map_classes
+    target_map                = cfg.target_map
+    max_per_client            = cfg.max_per_client
+    local_lr                  = cfg.local_lr
+    local_steps               = cfg.local_steps
+    probe_batches             = cfg.probe_batches
+    mom_beta                  = cfg.mom_beta
+    reward_window_W           = cfg.reward_window_W
+    marl_eps                  = cfg.marl_eps
+    marl_swap_m               = cfg.marl_swap_m
+    marl_lr                   = cfg.marl_lr
+    marl_gamma                = cfg.marl_gamma
+    marl_hidden               = cfg.marl_hidden
+    marl_target_sync_every    = cfg.marl_target_sync_every
+    warmup_transitions        = cfg.warmup_transitions
+    start_train_round         = cfg.start_train_round
+    updates_per_round         = cfg.updates_per_round
+    train_every               = cfg.train_every
+    buf_size                  = cfg.buf_size
+    batch_base                = cfg.batch_base
+    batch_max                 = cfg.batch_max
+    batch_buffer_ratio        = cfg.batch_buffer_ratio
+    per_alpha                 = cfg.per_alpha
+    per_beta_start            = cfg.per_beta_start
+    per_beta_end              = cfg.per_beta_end
+    per_beta_steps            = cfg.per_beta_steps
+    per_eps                   = cfg.per_eps
+    val_shuffle               = cfg.val_shuffle
+    val_per_class             = cfg.val_per_class
+    eval_max_batches          = cfg.eval_max_batches
+    print_every               = cfg.print_every
+    print_advfo_every         = cfg.print_advfo_every
+    out_dir                   = cfg.out_dir
+    exp_name                  = cfg.exp_name
+    save_results              = cfg.save_results
+    # ----------------------------------------------------------------------------------
 
     if attack_rounds is None:
         attack_rounds = [150]
@@ -203,7 +161,7 @@ def run_experiment(
                 if ph.get("end_round") is None:
                     ph["end_round"] = int(rounds)
 
-        # Preenche resumo de acurácia final
+        # Preenche resumo de acuracia final
         if log["tracks"]["fedavg"]["test_acc"]:
             log["resumo"]["fedavg_acuracia_final_%"] = round(log["tracks"]["fedavg"]["test_acc"][-1] * 100, 2)
         if log["tracks"]["marl"]["test_acc"]:
@@ -214,12 +172,12 @@ def run_experiment(
             json.dump(log, f, indent=2)
         print(f"\n[JSON] salvo em: {str(out_path)}\n", flush=True)
 
-        # Gera gráfico automaticamente
+        # Gera grafico automaticamente
         try:
             import subprocess
             subprocess.run(["python", "plot.py", str(out_path)], check=True)
         except Exception as e:
-            print(f"[PLOT] Erro ao gerar gráfico: {e}", flush=True)
+            print(f"[PLOT] Erro ao gerar grafico: {e}", flush=True)
 
     def start_phase(track: str, start_round: int, attacked: List[int]):
         log["tracks"][track]["selection_phases"].append({

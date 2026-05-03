@@ -5,7 +5,7 @@
     "marl_acuracia_final_%": 65.31
   },
   "meta": {
-    "run_id": "edd531b449",
+    "run_id": "39348b885b",
     "seed": 2049,
     "device": "cuda",
     "rounds": 500,
