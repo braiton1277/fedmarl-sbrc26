@@ -1,11 +1,14 @@
 """
-Teste mínimo de execução para verificação da instalação.
-Roda 10 rodadas com 10 clientes — deve completar em poucos minutos em CPU.
-Não gera JSON nem gráfico.
+Teste minimo de execucao para verificacao da instalacao.
+Roda 10 rodadas com 10 clientes - deve completar em poucos minutos em CPU.
+Nao gera JSON nem grafico.
 """
+from config import ExperimentConfig
 from experiment import run_experiment
 
-run_experiment(
+
+cfg = ExperimentConfig(
+    exp_name="test_min",
     rounds=10,
     n_clients=10,
     k_select=3,
@@ -22,3 +25,5 @@ run_experiment(
     out_dir=".",
     save_results=False,
 )
+
+run_experiment(cfg)
